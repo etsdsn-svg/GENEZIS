@@ -261,7 +261,7 @@ tbody tr:last-child td{border-bottom:0}
 <div id="authscreen" hidden style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
   <div class="authbox">
     <h1>GENEZIS</h1>
-    <p class="sub">Transport d'agrégats — connexion</p>
+    <p class="sub" id="auth-sub">Transport d'agrégats — connexion</p>
     <div class="field">
       <label>Adresse e-mail</label>
       <input class="control" id="auth-email" type="email" autocomplete="username" style="width:100%">
@@ -269,9 +269,13 @@ tbody tr:last-child td{border-bottom:0}
     <div class="field">
       <label>Mot de passe</label>
       <input class="control" id="auth-pass" type="password" autocomplete="current-password" style="width:100%">
+      <p class="hint" id="auth-pass-hint" hidden>Au moins 6 caractères.</p>
     </div>
     <button class="btn" id="auth-submit" style="width:100%">Se connecter</button>
     <p class="autherr" id="auth-err"></p>
+    <p style="text-align:center;margin-top:14px;font-size:13px">
+      <button id="auth-toggle" type="button" style="background:none;border:0;color:var(--accent);font-weight:600;font-size:13px">Pas encore de compte ? Créer un compte</button>
+    </p>
   </div>
 </div>
 
