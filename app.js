@@ -146,21 +146,55 @@ async function loadCurrentUser(userId, email) {
   CURRENT_USER = data;
 }
 
+let AUTH_MODE = "login"; // "login" | "signup"
+
+document.getElementById("auth-toggle").addEventListener("click", () => {
+  AUTH_MODE = AUTH_MODE === "login" ? "signup" : "login";
+  document.getElementById("auth-sub").textContent =
+    AUTH_MODE === "login" ? "Transport d'agrégats — connexion" : "Transport d'agrégats — création de compte";
+  document.getElementById("auth-submit").textContent =
+    AUTH_MODE === "login" ? "Se connecter" : "Créer mon compte";
+  document.getElementById("auth-toggle").textContent =
+    AUTH_MODE === "login" ? "Pas encore de compte ? Créer un compte" : "Déjà un compte ? Se connecter";
+  document.getElementById("auth-pass-hint").hidden = AUTH_MODE === "login";
+  document.getElementById("auth-err").textContent = "";
+});
+
 document.getElementById("auth-submit").addEventListener("click", async () => {
   const email = document.getElementById("auth-email").value.trim();
   const pass = document.getElementById("auth-pass").value;
   const errEl = document.getElementById("auth-err");
   errEl.textContent = "";
   if (!email || !pass) { errEl.textContent = "Adresse e-mail et mot de passe requis."; return; }
+  if (AUTH_MODE === "signup" && pass.length < 6) { errEl.textContent = "Le mot de passe doit faire au moins 6 caractères."; return; }
 
-  let { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-  if (error) {
-    // Compte inexistant : on le crée (première connexion = inscription)
-    const { data: signup, error: signupErr } = await sb.auth.signUp({ email, password: pass });
-    if (signupErr) { errEl.textContent = signupErr.message; return; }
-    data = signup;
+  document.getElementById("auth-submit").disabled = true;
+
+  if (AUTH_MODE === "signup") {
+    const { data, error } = await sb.auth.signUp({ email, password: pass });
+    if (error) {
+      errEl.textContent = error.message.includes("already registered")
+        ? "Un compte existe déjà avec cette adresse — connectez-vous plutôt."
+        : error.message;
+      document.getElementById("auth-submit").disabled = false;
+      return;
+    }
+    if (!data.session) {
+      errEl.textContent = "Compte créé. Vérifiez votre e-mail pour confirmer, puis connectez-vous.";
+      document.getElementById("auth-submit").disabled = false;
+      return;
+    }
+    await loadCurrentUser(data.user.id, data.user.email);
+  } else {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) {
+      errEl.textContent = "E-mail ou mot de passe incorrect.";
+      document.getElementById("auth-submit").disabled = false;
+      return;
+    }
+    await loadCurrentUser(data.user.id, data.user.email);
   }
-  await loadCurrentUser(data.user.id, data.user.email);
+
   document.getElementById("authscreen").hidden = true;
   showApp();
 });
