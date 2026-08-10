@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GENEZIS — Transport d'agrégats</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.45.4/supabase.min.js"></script>
+<style>
+/* ============================================================
+   GENEZIS — direction C "Fiche de route"
+   Orange haute visibilité, contraste fort, saisie terrain.
+   ============================================================ */
+:root{
+  --bg:#FFFDF8; --surface:#FFFFFF; --ink:#1E2127; --muted:#6D737D;
+  --line:#E2DED4; --line-soft:#F0EDE5;
+  --accent:#F25C05; --accent-soft:#FFF0E6;
+  --warn:#C42B1C; --warn-soft:#FBEAE9;
+  --amber:#A66A0A; --amber-soft:#FCF2E1;
+  --ok:#0F7A52; --ok-soft:#E4F4EC;
+  --radius:12px;
+  --f-display:"Space Grotesk",sans-serif;
+  --f-body:"Inter",sans-serif;
+  --f-mono:"JetBrains Mono",monospace;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--f-body);
+  -webkit-font-smoothing:antialiased;font-size:15px;line-height:1.5;
+  min-height:100vh;
+}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+
+/* ---------- Écran de chargement / auth ---------- */
+#boot{
+  position:fixed;inset:0;background:var(--bg);display:flex;
+  align-items:center;justify-content:center;z-index:200;
+}
+#boot .mark{font-family:var(--f-display);font-size:28px;font-weight:700;color:var(--accent)}
+
+.authbox{
+  max-width:380px;width:100%;margin:0 auto;padding:32px 24px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:0 8px 30px rgba(30,33,39,.06);
+}
+.authbox h1{font-family:var(--f-display);font-size:24px;margin:0 0 4px;letter-spacing:-.02em}
+.authbox p.sub{color:var(--muted);font-size:13.5px;margin:0 0 22px}
+.authbox .field{margin-bottom:14px}
+.authbox label{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.authbox input{width:100%;font-size:16px;border:1px solid var(--line);border-radius:8px;padding:13px 14px;min-height:52px}
+.authbox input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.autherr{font-size:12.5px;color:var(--warn);margin:8px 0 0;min-height:16px}
+
+/* ---------- Chrome de l'application ---------- */
+#app[hidden]{display:none}
+.topbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:13px 16px;background:var(--surface);border-bottom:1px solid var(--line);
+}
+.brand{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:-.03em;color:var(--ink)}
+.brand span{color:var(--accent)}
+.who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.who button{background:none;border:1px solid var(--line);border-radius:7px;padding:6px 11px;font-size:12.5px;color:var(--ink)}
+
+.tabs{
+  display:flex;gap:2px;padding:0 16px;background:var(--surface);
+  border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;
+  position:sticky;top:53px;z-index:39;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{
+  appearance:none;background:none;border:0;font-size:13.5px;font-weight:500;
+  color:var(--muted);padding:12px 13px;white-space:nowrap;
+  border-bottom:2.5px solid transparent;margin-bottom:-1px;
+}
+.tabs button.active{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+
+.screen{max-width:1100px;margin:0 auto;padding:18px 16px 90px}
+.screen[hidden]{display:none}
+
+/* ---------- Grille ---------- */
+.grid{display:grid;gap:12px;grid-template-columns:1fr}
+@media(min-width:640px){ .grid{grid-template-columns:repeat(2,1fr)} }
+@media(min-width:1000px){ .grid{grid-template-columns:repeat(3,1fr)} }
+.span-all{grid-column:1/-1}
+
+/* ---------- Cartes ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 17px;box-shadow:0 1px 2px rgba(30,33,39,.04)}
+.card-label{font-family:var(--f-mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.stat{font-family:var(--f-display);font-size:29px;font-weight:700;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+.stat .unit{font-size:13px;font-weight:500;color:var(--muted);margin-left:5px}
+.stat.pos{color:var(--ok)} .stat.neg{color:var(--warn)}
+.card-foot{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.4}
+
+/* ---------- Boutons ---------- */
+.btn{
+  font-size:14.5px;font-weight:700;border-radius:9px;padding:13px 20px;
+  border:1px solid transparent;min-height:50px;background:var(--accent);color:#fff;
+}
+.btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.btn.small{padding:8px 14px;min-height:38px;font-size:13px}
+.btn.danger{background:var(--warn)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+
+.fab{
+  position:fixed;right:18px;bottom:18px;z-index:30;
+  width:58px;height:58px;border-radius:50%;background:var(--accent);color:#fff;
+  font-size:26px;display:flex;align-items:center;justify-content:center;
+  border:0;box-shadow:0 8px 22px rgba(242,92,5,.4);
+}
+
+/* ---------- Formulaires ---------- */
+.form-grid{display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:640px){ .form-grid{grid-template-columns:repeat(2,1fr)} }
+.field label{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.control{width:100%;font-size:16px;border:1px solid var(--line);border-radius:8px;padding:12px 13px;background:var(--surface);color:var(--ink);min-height:52px}
+.control:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.control.big{font-family:var(--f-mono);font-size:24px;font-weight:600}
+.control[disabled]{background:var(--line-soft);color:var(--muted)}
+.hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
+.hint.alert{color:var(--warn);font-weight:600}
+select.control{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236D737D'%3E%3Cpath d='M5 7l5 5 5-5' stroke='%236D737D' stroke-width='2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center}
+
+datalist{}
+
+.suggestwrap{position:relative}
+.suggest{
+  position:absolute;left:0;right:0;top:100%;z-index:20;
+  background:var(--surface);border:1px solid var(--line);border-top:0;
+  border-radius:0 0 8px 8px;box-shadow:0 8px 20px rgba(0,0,0,.08);
+  max-height:220px;overflow-y:auto;
+}
+.suggest[hidden]{display:none}
+.suggest div{padding:11px 13px;font-size:13.5px;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between;gap:8px}
+.suggest div:hover,.suggest div.hi{background:var(--accent-soft)}
+.suggest div:last-child{border-bottom:0}
+.suggest .new{color:var(--accent);font-weight:700}
+.suggest .sub{color:var(--muted);font-size:11.5px}
+
+/* ---------- Photo ---------- */
+.photo-slot{
+  border:1.5px dashed var(--line);border-radius:10px;padding:18px 14px;
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+  text-align:center;background:#FAFCFE;
+}
+.photo-slot .icon{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px}
+.photo-slot .txt{font-size:13px;font-weight:700}
+.photo-slot .txt2{font-size:11px;color:var(--muted)}
+.photo-slot input[type=file]{display:none}
+.photo-done{
+  border:1.5px solid var(--ok);border-radius:10px;padding:11px 13px;
+  display:flex;align-items:center;gap:11px;background:var(--ok-soft);
+}
+.photo-done img{width:48px;height:48px;border-radius:8px;object-fit:cover;flex:none;border:1px solid #BFE0CC}
+.photo-done .info{flex:1;min-width:0;font-size:12px}
+.photo-done .info b{display:block;font-size:12.5px}
+.photo-done button{background:none;border:0;color:var(--accent);font-family:var(--f-mono);font-size:11px}
+
+/* ---------- Progression voyage ---------- */
+.progress{display:flex;align-items:center;margin-bottom:16px}
+.pstep{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;position:relative}
+.pstep .dot{width:24px;height:24px;border-radius:50%;background:var(--surface);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:11px;font-weight:700;color:var(--muted);z-index:1}
+.pstep.done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+.pstep.active .dot{background:var(--accent);border-color:var(--accent);color:#fff}
+.pstep .lbl{font-size:10.5px;color:var(--muted);font-weight:500}
+.pstep.done .lbl,.pstep.active .lbl{color:var(--ink);font-weight:700}
+.pline{position:absolute;top:11px;left:50%;width:100%;height:2px;background:var(--line);z-index:0}
+.pstep.done .pline{background:var(--ok)}
+.pstep:last-child .pline{display:none}
+
+/* ---------- Listes ---------- */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{font-family:var(--f-mono);font-size:11.5px;padding:7px 12px;border-radius:20px;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
+.chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.search{flex:1;min-width:150px;font-size:13.5px;border:1px solid var(--line);border-radius:20px;padding:8px 14px}
+
+.rowlist{display:flex;flex-direction:column;gap:8px}
+.row{
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:13px 15px;cursor:pointer;transition:border-color .12s;
+}
+.row:hover{border-color:var(--accent)}
+.row .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.row .id{font-family:var(--f-mono);font-size:13.5px;font-weight:700}
+.row .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.row .right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.row .amt{font-family:var(--f-mono);font-size:13px;font-weight:700}
+
+.badge{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;padding:4px 9px;border-radius:20px;white-space:nowrap}
+.badge.charge{background:var(--amber-soft);color:var(--amber)}
+.badge.livre{background:var(--accent-soft);color:var(--accent)}
+.badge.cloture{background:var(--line-soft);color:var(--muted)}
+.badge.encours{background:var(--accent-soft);color:var(--accent)}
+.badge.solde{background:var(--ok-soft);color:var(--ok)}
+.badge.retard{background:var(--warn-soft);color:var(--warn)}
+
+.bar{height:6px;border-radius:4px;background:var(--line-soft);overflow:hidden;margin-top:8px}
+.bar > i{display:block;height:100%;background:var(--accent);border-radius:4px}
+
+/* ---------- Tables ---------- */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+th{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:400;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th.num{text-align:right}
+td{padding:9px 8px;border-bottom:1px solid var(--line-soft)}
+td.num{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+
+/* ---------- Décompte ---------- */
+.recap-line{display:flex;justify-content:space-between;gap:12px;padding:9px 0;font-size:13.5px;border-bottom:1px solid var(--line-soft)}
+.recap-line span:last-child{font-family:var(--f-mono);white-space:nowrap}
+.recap-line.minus span:last-child{color:var(--warn)}
+.recap-solde{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;padding-top:14px;border-top:2px solid var(--line)}
+.recap-solde .lbl{font-family:var(--f-mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.recap-solde .val{font-family:var(--f-mono);font-size:25px;font-weight:700}
+.share{margin-top:14px;padding:13px 14px;border:1px dashed var(--line);border-radius:9px;font-family:var(--f-mono);font-size:12px;line-height:1.75;white-space:pre-wrap;color:var(--muted)}
+.share b{color:var(--ink)}
+
+/* ---------- Modales ---------- */
+.overlay{position:fixed;inset:0;background:rgba(30,33,39,.5);z-index:100;display:flex;align-items:flex-end;justify-content:center}
+.overlay[hidden]{display:none}
+@media(min-width:640px){ .overlay{align-items:center} }
+.modal{
+  background:var(--surface);width:100%;max-width:560px;max-height:88vh;overflow-y:auto;
+  border-radius:16px 16px 0 0;padding:22px;
+}
+@media(min-width:640px){ .modal{border-radius:16px} }
+.modal h2{font-family:var(--f-display);font-size:18px;margin:0 0 4px}
+.modal .sub{font-size:12.5px;color:var(--muted);margin:0 0 18px}
+
+.alert-box{background:var(--amber-soft);border:1px solid #E9C98A;border-radius:9px;padding:12px 14px;font-size:13px;color:#6B4A0A;margin:10px 0;display:flex;gap:9px;align-items:flex-start}
+.split{display:grid;gap:10px;grid-template-columns:1fr;margin:10px 0}
+@media(min-width:520px){ .split{grid-template-columns:1fr 1fr} }
+.split-card{border:1.5px solid var(--line);border-radius:9px;padding:12px 13px}
+.split-card.new{border-color:var(--accent);background:var(--accent-soft)}
+.split-card .tag{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+  background:var(--ink);color:#fff;padding:12px 20px;border-radius:9px;
+  font-size:13.5px;z-index:150;box-shadow:0 8px 24px rgba(0,0,0,.25);
+  opacity:0;transition:opacity .2s;pointer-events:none;
+}
+.toast.show{opacity:1}
+
+.empty{font-size:13px;color:var(--muted);background:#FAFCFE;border:1px dashed var(--line);border-radius:9px;padding:20px;text-align:center}
+.loading{font-size:13px;color:var(--muted);padding:20px;text-align:center}
+</style>
+</head>
+<body>
+
+<div id="boot"><div class="mark">GENEZIS</div></div>
+
+<div id="authscreen" hidden style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div class="authbox">
+    <h1>GENEZIS</h1>
+    <p class="sub">Transport d'agrégats — connexion</p>
+    <div class="field">
+      <label>Adresse e-mail</label>
+      <input class="control" id="auth-email" type="email" autocomplete="username" style="width:100%">
+    </div>
+    <div class="field">
+      <label>Mot de passe</label>
+      <input class="control" id="auth-pass" type="password" autocomplete="current-password" style="width:100%">
+    </div>
+    <button class="btn" id="auth-submit" style="width:100%">Se connecter</button>
+    <p class="autherr" id="auth-err"></p>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <div class="topbar">
+    <div class="brand">GENEZIS<span>.</span></div>
+    <div class="who">
+      <span id="who-name"></span>
+      <button id="btn-logout">Déconnexion</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-screen="dashboard" class="active">Tableau de bord</button>
+    <button data-screen="attente">En attente</button>
+    <button data-screen="bcs">Bons de commande</button>
+    <button data-screen="transporteurs">Transporteurs</button>
+  </div>
+
+  <!-- ============== TABLEAU DE BORD ============== -->
+  <section class="screen" id="s-dashboard">
+    <div id="dash-content" class="grid"><div class="loading">Chargement…</div></div>
+  </section>
+
+  <!-- ============== VOYAGES EN ATTENTE DE LIVRAISON ============== -->
+  <section class="screen" id="s-attente" hidden>
+    <div class="filters">
+      <span class="chip active">Tous</span>
+    </div>
+    <div id="attente-content" class="rowlist"><div class="loading">Chargement…</div></div>
+  </section>
+
+  <!-- ============== BONS DE COMMANDE ============== -->
+  <section class="screen" id="s-bcs" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <h1 style="font-family:var(--f-display);font-size:19px;margin:0">Bons de commande</h1>
+      <button class="btn small" id="btn-new-bc">+ Nouveau BC</button>
+    </div>
+    <div id="bcs-content" class="rowlist"><div class="loading">Chargement…</div></div>
+  </section>
+
+  <!-- ============== FICHE D'UN BC ============== -->
+  <section class="screen" id="s-bc-detail" hidden>
+    <button class="btn ghost small" id="btn-back-bcs" style="margin-bottom:14px">← Tous les BC</button>
+    <div id="bc-detail-content"><div class="loading">Chargement…</div></div>
+  </section>
+
+  <!-- ============== TRANSPORTEURS ============== -->
+  <section class="screen" id="s-transporteurs" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <h1 style="font-family:var(--f-display);font-size:19px;margin:0">Transporteurs</h1>
+      <button class="btn small" id="btn-new-transporteur">+ Nouveau transporteur</button>
+    </div>
+    <div id="transporteurs-content" class="rowlist"><div class="loading">Chargement…</div></div>
+  </section>
+
+  <!-- ============== FICHE TRANSPORTEUR / DÉCOMPTE ============== -->
+  <section class="screen" id="s-transporteur-detail" hidden>
+    <button class="btn ghost small" id="btn-back-transporteurs" style="margin-bottom:14px">← Tous les transporteurs</button>
+    <div id="transporteur-detail-content"><div class="loading">Chargement…</div></div>
+  </section>
+
+  <button class="fab" id="fab-voyage" title="Nouveau voyage">+</button>
+</div>
+
+<!-- ============== MODALE : NOUVEAU VOYAGE (DÉPART) ============== -->
+<div class="overlay" id="modal-voyage" hidden>
+  <div class="modal">
+    <h2>Nouveau voyage</h2>
+    <p class="sub">À la carrière, ticket de bascule en main.</p>
+    <div class="progress">
+      <div class="pstep active"><div class="pline"></div><span class="dot">1</span><span class="lbl">Départ</span></div>
+      <div class="pstep"><div class="pline"></div><span class="dot">2</span><span class="lbl">En route</span></div>
+      <div class="pstep"><span class="dot">3</span><span class="lbl">Livraison</span></div>
+    </div>
+    <div id="voyage-form-content"></div>
+  </div>
+</div>
+
+<!-- ============== MODALE : CONFIRMER LIVRAISON ============== -->
+<div class="overlay" id="modal-livraison" hidden>
+  <div class="modal">
+    <h2>Confirmer la livraison</h2>
+    <p class="sub" id="livraison-sub"></p>
+    <div class="progress">
+      <div class="pstep done"><div class="pline"></div><span class="dot">✓</span><span class="lbl">Départ</span></div>
+      <div class="pstep active"><div class="pline"></div><span class="dot">2</span><span class="lbl">En route</span></div>
+      <div class="pstep"><span class="dot">3</span><span class="lbl">Livraison</span></div>
+    </div>
+    <div id="livraison-form-content"></div>
+  </div>
+</div>
+
+<!-- ============== MODALE : DÉPASSEMENT ============== -->
+<div class="overlay" id="modal-depassement" hidden>
+  <div class="modal">
+    <h2>Ce voyage dépasse le reste de la ligne</h2>
+    <div id="depassement-content"></div>
+  </div>
+</div>
+
+<!-- ============== MODALE : NOUVEAU BC ============== -->
+<div class="overlay" id="modal-bc" hidden>
+  <div class="modal">
+    <h2>Nouveau bon de commande</h2>
+    <p class="sub">Le chantier n'est pas fixé ici : chaque voyage précisera où il livre.</p>
+    <div id="bc-form-content"></div>
+  </div>
+</div>
+
+<!-- ============== MODALE : NOUVEAU TRANSPORTEUR ============== -->
+<div class="overlay" id="modal-transporteur" hidden>
+  <div class="modal">
+    <h2>Nouveau transporteur</h2>
+    <div id="transporteur-form-content"></div>
+  </div>
+</div>
+
+<!-- ============== MODALE : NOUVEAU TRAJET (grille progressive) ============== -->
+<div class="overlay" id="modal-trajet" hidden>
+  <div class="modal">
+    <h2>Premier voyage sur ce trajet</h2>
+    <p class="sub">Renseignez le tarif une fois : il s'appliquera à tous les prochains voyages sur ce trajet.</p>
+    <div id="trajet-form-content"></div>
+  </div>
+</div>
+
+<!-- ============== MODALE : MOUVEMENT TRANSPORTEUR ============== -->
+<div class="overlay" id="modal-mouvement" hidden>
+  <div class="modal">
+    <h2>Nouveau mouvement</h2>
+    <div id="mouvement-form-content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
